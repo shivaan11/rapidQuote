@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase";
 import { fusePrompt } from "@/lib/prompt-fusion";
 import { runImagePipeline, GeminiRefusalError } from "@/lib/image-pipeline";
+import { getImageModel } from "@/lib/gemini";
 import { randomUUID } from "crypto";
 import { after } from "next/server";
 import type { Stroke, StrokeCounts } from "@/lib/types";
@@ -87,11 +88,21 @@ export async function POST(request: Request) {
 
       // 1. Prompt fusion via Claude Haiku
       const counts = countStrokes(strokes);
-      const { finalPrompt, reasoning } = await fusePrompt(counts, notes);
+      const { finalPrompt, reasoning, masterPrompt, userMessage } =
+        await fusePrompt(counts, notes);
+
+      const imageModel = getImageModel();
 
       await supabase
         .from("generations")
-        .update({ fusion_log: `${reasoning}\n\n---\n\n${finalPrompt}` })
+        .update({
+          master_prompt: masterPrompt,
+          user_message: userMessage,
+          fused_prompt: finalPrompt,
+          fusion_reasoning: reasoning,
+          image_model: imageModel,
+          fusion_log: `${reasoning}\n\n---\n\n${finalPrompt}`,
+        })
         .eq("id", genId);
 
       // 2. Gemini image generation

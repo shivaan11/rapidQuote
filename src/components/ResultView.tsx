@@ -39,8 +39,36 @@ export default function ResultView({
   const [error, setError] = useState<string | null>(null);
 
   const [activeGenId, setActiveGenId] = useState(genId);
-  const activeGen = generations.find((g) => g.id === activeGenId);
+  const [gens, setGens] = useState(generations);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const activeGen = gens.find((g) => g.id === activeGenId);
   const activeResultUrl = activeGen?.resultUrl ?? resultUrl;
+
+  async function handleDeleteGeneration(targetId: string) {
+    if (gens.length <= 1) return;
+    if (!confirm("Delete this generation? This can't be undone.")) return;
+    setDeletingId(targetId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/generations/${targetId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      const remaining = gens.filter((g) => g.id !== targetId);
+      setGens(remaining);
+      if (activeGenId === targetId) {
+        const next = remaining[0];
+        if (next) {
+          setActiveGenId(next.id);
+          router.replace(`/result/${sessionId}/${next.id}`);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -108,22 +136,44 @@ export default function ResultView({
       </div>
 
       {/* Generation picker */}
-      {generations.length > 1 && (
+      {gens.length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2">
-          {generations.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => setActiveGenId(g.id)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition active:scale-95 ${
-                activeGenId === g.id
-                  ? "bg-charcoal text-cream"
-                  : "bg-charcoal/8 text-charcoal hover:bg-charcoal/15"
-              }`}
-            >
-              {g.label}
-            </button>
-          ))}
+          {gens.map((g) => {
+            const isActive = activeGenId === g.id;
+            const isDeleting = deletingId === g.id;
+            return (
+              <div
+                key={g.id}
+                className={`flex shrink-0 items-center rounded-full text-xs font-medium transition ${
+                  isActive
+                    ? "bg-charcoal text-cream"
+                    : "bg-charcoal/8 text-charcoal hover:bg-charcoal/15"
+                } ${isDeleting ? "opacity-50" : ""}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveGenId(g.id)}
+                  disabled={isDeleting}
+                  className="py-1.5 pl-4 pr-2 transition active:scale-95"
+                >
+                  {g.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteGeneration(g.id)}
+                  disabled={isDeleting}
+                  aria-label={`Delete ${g.label}`}
+                  className={`mr-1 flex h-6 w-6 items-center justify-center rounded-full text-[10px] transition active:scale-90 ${
+                    isActive
+                      ? "text-cream/70 hover:bg-cream/15 hover:text-cream"
+                      : "text-charcoal/50 hover:bg-charcoal/15 hover:text-charcoal"
+                  }`}
+                >
+                  {isDeleting ? <Spinner /> : "✕"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 

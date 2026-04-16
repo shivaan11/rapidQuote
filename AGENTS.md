@@ -81,7 +81,7 @@ npm run dev                  # http://localhost:3000
 | `SUPABASE_SERVICE_KEY` | Supabase service role key (server only — never ship to client) | Supabase → Project Settings → API |
 | `ANTHROPIC_API_KEY` | Claude Haiku for prompt fusion | https://console.anthropic.com/settings/keys |
 | `GEMINI_API_KEY` | Google AI Studio key for Gemini image gen | https://aistudio.google.com/apikey |
-| `GEMINI_IMAGE_MODEL` | Pinned model ID, e.g. `gemini-2.5-flash-image-preview` | Set in `.env.local`, upgrade explicitly |
+| `GEMINI_IMAGE_MODEL` | Pinned model ID, e.g. `gemini-3-pro-image-preview` (Nano Banana Pro) | Set in `.env.local`, upgrade explicitly |
 
 See `.env.example` for the full template. `/api/health` reports which services are configured.
 
