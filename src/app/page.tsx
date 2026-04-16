@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 
 export default async function Home() {
+  await connection();
+
   let recentSessions: {
     id: string;
     label: string | null;
