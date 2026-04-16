@@ -24,10 +24,11 @@ export default async function Home() {
 
   const sessionsWithResults = recentSessions
     .map((s) => {
-      const gen = s.generations?.find(
-        (g: { status: string }) => g.status === "complete",
-      );
-      return gen ? { ...s, genId: gen.id, resultUrl: gen.result_url } : null;
+      const completedGens = (s.generations ?? [])
+        .filter((g: { status: string }) => g.status === "complete")
+        .sort((a: { id: string }, b: { id: string }) => b.id.localeCompare(a.id));
+      const latest = completedGens[0];
+      return latest ? { ...s, genId: latest.id, resultUrl: latest.result_url } : null;
     })
     .filter(Boolean) as (typeof recentSessions[0] & { genId: string; resultUrl: string | null })[];
 

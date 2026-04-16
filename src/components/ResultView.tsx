@@ -4,6 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 
+type GenerationOption = {
+  id: string;
+  resultUrl: string;
+  label: string;
+  createdAt: string;
+};
+
 type Props = {
   sessionId: string;
   genId: string;
@@ -11,6 +18,7 @@ type Props = {
   resultUrl: string;
   annotatedUrl?: string;
   label?: string;
+  generations?: GenerationOption[];
 };
 
 export default function ResultView({
@@ -20,6 +28,7 @@ export default function ResultView({
   resultUrl,
   annotatedUrl,
   label,
+  generations = [],
 }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -28,6 +37,10 @@ export default function ResultView({
   const [savedLabel, setSavedLabel] = useState(label ?? "");
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [activeGenId, setActiveGenId] = useState(genId);
+  const activeGen = generations.find((g) => g.id === activeGenId);
+  const activeResultUrl = activeGen?.resultUrl ?? resultUrl;
 
   async function handleSave() {
     setSaving(true);
@@ -64,12 +77,12 @@ export default function ResultView({
   async function handleDownload() {
     setDownloading(true);
     try {
-      const res = await fetch(resultUrl);
+      const res = await fetch(activeResultUrl);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `lighting-render-${genId.slice(0, 8)}.png`;
+      a.download = `lighting-render-${activeGenId.slice(0, 8)}.png`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -94,6 +107,26 @@ export default function ResultView({
         <div className="w-12" />
       </div>
 
+      {/* Generation picker */}
+      {generations.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2">
+          {generations.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => setActiveGenId(g.id)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition active:scale-95 ${
+                activeGenId === g.id
+                  ? "bg-charcoal text-cream"
+                  : "bg-charcoal/8 text-charcoal hover:bg-charcoal/15"
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
         <div className="mx-4 mb-2 flex items-center justify-between rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">
@@ -104,23 +137,24 @@ export default function ResultView({
 
       {/* Before/After slider */}
       <div className="flex flex-1 flex-col items-center justify-center px-4 pb-4">
-        <div className="w-full overflow-hidden rounded-2xl shadow-lg" style={{ maxHeight: "calc(100dvh - 11rem)" }}>
+        <div className="w-full overflow-hidden rounded-2xl shadow-lg" style={{ maxHeight: "calc(100dvh - 13rem)" }}>
           <ReactCompareSlider
+            key={activeGenId}
             itemOne={
               <ReactCompareSliderImage
                 src={originalUrl}
                 alt="Original photo"
-                style={{ objectFit: "contain", maxHeight: "calc(100dvh - 11rem)" }}
+                style={{ objectFit: "contain", maxHeight: "calc(100dvh - 13rem)" }}
               />
             }
             itemTwo={
               <ReactCompareSliderImage
-                src={resultUrl}
+                src={activeResultUrl}
                 alt="AI-generated lighting render"
-                style={{ objectFit: "contain", maxHeight: "calc(100dvh - 11rem)" }}
+                style={{ objectFit: "contain", maxHeight: "calc(100dvh - 13rem)" }}
               />
             }
-            style={{ width: "100%", maxHeight: "calc(100dvh - 11rem)" }}
+            style={{ width: "100%", maxHeight: "calc(100dvh - 13rem)" }}
           />
         </div>
         <p className="mt-2 text-center text-xs text-charcoal-muted">
