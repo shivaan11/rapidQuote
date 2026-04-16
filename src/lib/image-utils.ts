@@ -49,8 +49,19 @@ export function getSvgPathFromStroke(points: number[][]): string {
 export async function flattenCanvasToBlob(
   bgImage: HTMLImageElement,
   svgElement: SVGSVGElement,
+  maxEdge = 1536,
+  quality = 0.82,
 ): Promise<Blob> {
-  const { naturalWidth: w, naturalHeight: h } = bgImage;
+  const natW = bgImage.naturalWidth;
+  const natH = bgImage.naturalHeight;
+
+  let w = natW;
+  let h = natH;
+  if (Math.max(natW, natH) > maxEdge) {
+    const ratio = maxEdge / Math.max(natW, natH);
+    w = Math.round(natW * ratio);
+    h = Math.round(natH * ratio);
+  }
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -79,7 +90,7 @@ export async function flattenCanvasToBlob(
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("Canvas toBlob failed"))),
       "image/jpeg",
-      0.9,
+      quality,
     );
   });
 }

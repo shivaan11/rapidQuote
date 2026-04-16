@@ -258,10 +258,24 @@ export default function AnnotationCanvas({ sessionId, originalUrl, initialStroke
     setGenerating(true);
     try {
       const blob = await flattenCanvasToBlob(imgRef.current, svgRef.current);
+      const strokesJson = JSON.stringify(strokes);
+      console.log("[generate] payload sizes", {
+        annotatedBlobKB: Math.round(blob.size / 1024),
+        blobType: blob.type,
+        strokesJsonKB: Math.round(strokesJson.length / 1024),
+        notesBytes: notes.length,
+      });
+
+      if (blob.size > 4 * 1024 * 1024) {
+        throw new Error(
+          `Annotated image is ${Math.round(blob.size / 1024 / 1024)}MB — too large to upload. Try a simpler annotation.`,
+        );
+      }
+
       const form = new FormData();
       form.append("annotatedImage", blob, "annotated.jpg");
       form.append("sessionId", sessionId);
-      form.append("strokes", JSON.stringify(strokes));
+      form.append("strokes", strokesJson);
       if (notes.trim()) form.append("notes", notes.trim());
 
       const res = await fetch("/api/generate", { method: "POST", body: form });
