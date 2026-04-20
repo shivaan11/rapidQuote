@@ -27,9 +27,9 @@ const DEFAULT_STROKE_SIZE = 5;
 
 type SizeConfig = { min: number; max: number; def: number };
 const TOOL_SIZE: Record<Exclude<ToolKind, "eraser">, SizeConfig> = {
-  permanent: { min: 1, max: 10, def: 5 },
-  downlight: { min: 1, max: 10, def: 5 },
-  uplight: { min: 1, max: 10, def: 5 },
+  permanent: { min: 3, max: 8, def: 6 },
+  downlight: { min: 1, max: 10, def: 3 },
+  uplight: { min: 1, max: 10, def: 4 },
   pathlight: { min: 1, max: 10, def: 5 },
 };
 

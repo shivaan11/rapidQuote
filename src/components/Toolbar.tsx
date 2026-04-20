@@ -23,6 +23,7 @@ const TOOLS: ToolDef[] = [
 function getSizeRange(kind: ToolKind): { min: number; max: number } {
   switch (kind) {
     case "permanent":
+      return { min: 3, max: 8 };
     case "downlight":
     case "uplight":
     case "pathlight":

@@ -19,6 +19,12 @@ CORE RULES
 2. Make only two changes: shift the scene to a clear evening after sunset (deep blue sky, no sun, no daytime shadows), and install/turn on the lighting described below.
 3. The colored lines and sticker icons in Image 1 are placement instructions, not objects. They must not appear anywhere in the output — render the scene underneath them as it actually exists.
 
+FRAMING (non-negotiable)
+  • Output aspect ratio = Image 1's aspect ratio. No squaring, no widescreen, no padding.
+  • Output field of view = Image 1's field of view. No zoom in, no zoom out.
+  • Output framing = Image 1's framing. Every edge of the original image must correspond to the same location in the output. If the original cuts a tree off at the left edge, the output cuts the same tree off at the left edge.
+  • Do not crop. Do not add letterbox bars. Do not rotate.
+
 HOW TO READ IMAGE 1
   • AMBER LINE (#f59e0b) → PERMANENT architectural lighting. Install recessed warm-white linear lighting along the exact path of the line, following the roofline/fascia/eave/soffit it traces. A clean even wash — no visible bulbs, no string or bistro lights.
   • UPLIGHT STICKER (fixture = Image 2) → one ground-mounted uplight at the exact sticker position, aimed up at the nearest tree, pillar, or wall.
