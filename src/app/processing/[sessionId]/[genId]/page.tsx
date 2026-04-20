@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
+
+// Expected generation time with Nano Banana Pro. Only used to shape the
+// asymptotic progress curve — if it takes longer, the bar just pauses near 95%.
+const EXPECTED_DURATION_MS = 45_000;
 
 export default function ProcessingPage({
   params,
@@ -12,6 +16,9 @@ export default function ProcessingPage({
   const router = useRouter();
   const [status, setStatus] = useState("pending");
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startedAt = useRef<number>(Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -27,7 +34,11 @@ export default function ProcessingPage({
         setStatus(data.status);
 
         if (data.status === "complete") {
-          router.push(`/result/${sessionId}/${genId}`);
+          setProgress(100);
+          // Brief pause so the user sees the bar hit 100% before the route swap
+          setTimeout(() => {
+            if (!cancelled) router.push(`/result/${sessionId}/${genId}`);
+          }, 300);
           return;
         }
 
@@ -48,6 +59,20 @@ export default function ProcessingPage({
     };
   }, [genId, sessionId, router]);
 
+  // Tick the progress bar + elapsed counter every 200ms while the job is live.
+  // Curve: 95 * (1 - e^(-t/tau)) — fast at first, asymptotes at 95% until the
+  // poll returns "complete" and we snap to 100%.
+  useEffect(() => {
+    if (status === "complete" || status === "failed") return;
+    const tau = EXPECTED_DURATION_MS / 3;
+    const id = setInterval(() => {
+      const elapsed = Date.now() - startedAt.current;
+      setElapsedMs(elapsed);
+      setProgress(95 * (1 - Math.exp(-elapsed / tau)));
+    }, 200);
+    return () => clearInterval(id);
+  }, [status]);
+
   const stages: Record<string, string> = {
     pending: "Preparing your image…",
     processing: "Adding lights to your yard…",
@@ -55,18 +80,28 @@ export default function ProcessingPage({
     failed: "Something went wrong",
   };
 
+  const elapsedLabel = `${Math.floor(elapsedMs / 1000)}s`;
+
   return (
     <main className="flex h-dvh flex-col items-center justify-center bg-canvas-bg px-6">
-      <div className="flex flex-col items-center gap-6 text-center">
+      <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
         {status !== "failed" ? (
           <>
-            <div className="h-16 w-16 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
             <h1 className="font-serif text-2xl text-cream">
               {stages[status] ?? "Working…"}
             </h1>
-            <p className="text-sm text-cream/50">
-              Usually takes 15–20 seconds
-            </p>
+            <div className="w-full">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-cream/10">
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between text-xs text-cream/50">
+                <span>{Math.round(progress)}%</span>
+                <span>{elapsedLabel}</span>
+              </div>
+            </div>
           </>
         ) : (
           <>
