@@ -5,8 +5,8 @@
 
 export async function resizeImage(
   file: File,
-  maxEdge = 2048,
-  quality = 0.85,
+  maxEdge = 1536,
+  quality = 0.8,
 ): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const { width, height } = bitmap;

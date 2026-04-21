@@ -16,6 +16,14 @@ export default function CapturePage() {
 
     try {
       const resized = await resizeImage(file);
+      console.log("[upload] original", file.size, "resized", resized.size, resized.type);
+
+      if (resized.size > 4_000_000) {
+        throw new Error(
+          `Photo is too large after resize (${(resized.size / 1_000_000).toFixed(1)}MB). Try a different photo.`,
+        );
+      }
+
       const form = new FormData();
       form.append("image", resized, "photo.jpg");
 

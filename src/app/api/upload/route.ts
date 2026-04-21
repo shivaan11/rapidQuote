@@ -2,11 +2,25 @@ import { getSupabaseServer } from "@/lib/supabase";
 import { randomUUID } from "crypto";
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Invalid multipart body";
+    return Response.json({ error: `Could not parse upload: ${msg}` }, { status: 400 });
+  }
+
   const file = formData.get("image");
 
   if (!file || !(file instanceof Blob)) {
     return Response.json({ error: "Missing image field" }, { status: 400 });
+  }
+
+  if (file.size > 4_500_000) {
+    return Response.json(
+      { error: `Image too large (${(file.size / 1_000_000).toFixed(1)}MB). Max 4.5MB.` },
+      { status: 413 },
+    );
   }
 
   const supabase = getSupabaseServer();
