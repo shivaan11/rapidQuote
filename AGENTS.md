@@ -80,8 +80,10 @@ npm run dev                  # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (browser) | Supabase → Project Settings → API |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key (server only — never ship to client) | Supabase → Project Settings → API |
 | `ANTHROPIC_API_KEY` | Claude Haiku for prompt fusion | https://console.anthropic.com/settings/keys |
-| `GEMINI_API_KEY` | Google AI Studio key for Gemini image gen | https://aistudio.google.com/apikey |
+| `GEMINI_API_KEY` | Google AI Studio key for Gemini image gen (primary) | https://aistudio.google.com/apikey |
 | `GEMINI_IMAGE_MODEL` | Pinned model ID, e.g. `gemini-3-pro-image-preview` (Nano Banana Pro) | Set in `.env.local`, upgrade explicitly |
+| `FAL_KEY` | fal.ai key for backup FLUX Kontext Pro provider (optional) | https://fal.ai/dashboard/keys |
+| `FAL_IMAGE_MODEL` | fal.ai endpoint id. Defaults to `fal-ai/flux-pro/kontext`. | Set in `.env.local` |
 
 See `.env.example` for the full template. `/api/health` reports which services are configured.
 
@@ -240,7 +242,8 @@ If Kevin asks for any of these, treat it as a v2 conversation and surface it bef
 - **Client-side resize before upload.** Raw iPad photos are 5–10MB. Resize to max 2048px long edge, JPEG q=0.85 before upload. See `src/lib/image-utils.ts` (Phase 2).
 - **No pan/zoom on the canvas.** v1 ships with direct drawing only. Adding it is a multi-day effort because gesture handling fights with drawing on mobile Safari.
 - **Gemini returns inline bytes.** No polling against Gemini itself — extract image bytes from the response candidates in `src/lib/image-pipeline.ts` (Phase 3).
-- **Gemini can refuse.** Safety filters may reject some images. Treat refusals as a distinct error state with clearer copy, not a generic "generation failed."
+- **Gemini can refuse.** Safety filters may reject some images. Refusals propagate to the client as a distinct error — the pipeline deliberately does **not** fall back to FLUX on refusal, because the refusal is a content signal, not an availability signal.
+- **Automatic fallback on Gemini 5xx / network errors.** `src/lib/image-pipeline.ts` tries `geminiProvider` first; on any non-refusal exception (503, 500, network, timeout, unexpected shape), it silently retries against `fluxKontextProvider` (FLUX Kontext Pro via fal.ai). The processing screen never transitions to `failed` if the backup succeeds; the loading bar keeps climbing. `generations.fallback_used = true` and `generations.used_model` records which provider actually produced the result. ResultView surfaces a muted "info" chip + amber dot when the backup ran.
 - **Pin the Gemini model version.** `GEMINI_IMAGE_MODEL` is a specific version string, not a floating alias. Upgrade explicitly after validating.
 - **Service key is server-only.** `SUPABASE_SERVICE_KEY` must never appear in client bundles or `NEXT_PUBLIC_*` vars. Keep all Supabase writes inside route handlers.
 - **No rate limiting yet.** App is unauthenticated — anyone with the URL can burn Gemini credits (~$0.039 per generation). Add an IP-based limit or shared-secret gate before publishing a shareable URL. Tracked in the plan as an open item.

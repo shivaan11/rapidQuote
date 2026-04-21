@@ -9,6 +9,8 @@ type GenerationOption = {
   resultUrl: string;
   label: string;
   createdAt: string;
+  fallbackUsed?: boolean;
+  usedModel?: string | null;
 };
 
 type Props = {
@@ -19,7 +21,17 @@ type Props = {
   annotatedUrl?: string;
   label?: string;
   generations?: GenerationOption[];
+  primaryModel?: string | null;
+  usedModel?: string | null;
+  fallbackUsed?: boolean;
+  primaryError?: string | null;
 };
+
+function shortModel(model: string | null | undefined): string {
+  if (!model) return "unknown";
+  // Strip provider prefixes for readability in the small footer
+  return model.replace(/^fal-ai\//, "").replace(/^gemini-/, "gemini ");
+}
 
 export default function ResultView({
   sessionId,
@@ -29,6 +41,10 @@ export default function ResultView({
   annotatedUrl,
   label,
   generations = [],
+  primaryModel,
+  usedModel,
+  fallbackUsed = false,
+  primaryError,
 }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -43,6 +59,13 @@ export default function ResultView({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const activeGen = gens.find((g) => g.id === activeGenId);
   const activeResultUrl = activeGen?.resultUrl ?? resultUrl;
+  // Per-generation fallback state — for the currently selected pill when
+  // switching between generations; falls back to the originally-loaded row.
+  const activeFallbackUsed =
+    activeGenId === genId ? fallbackUsed : Boolean(activeGen?.fallbackUsed);
+  const activeUsedModel =
+    activeGenId === genId ? usedModel : activeGen?.usedModel ?? null;
+  const [showDebug, setShowDebug] = useState(false);
 
   async function handleDeleteGeneration(targetId: string) {
     if (gens.length <= 1) return;
@@ -154,8 +177,14 @@ export default function ResultView({
                   type="button"
                   onClick={() => setActiveGenId(g.id)}
                   disabled={isDeleting}
-                  className="py-1.5 pl-4 pr-2 transition active:scale-95"
+                  className="flex items-center gap-1.5 py-1.5 pl-4 pr-2 transition active:scale-95"
                 >
+                  {g.fallbackUsed && (
+                    <span
+                      className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"
+                      title="Backup model used"
+                    />
+                  )}
                   {g.label}
                 </button>
                 <button
@@ -210,6 +239,37 @@ export default function ResultView({
         <p className="mt-2 text-center text-xs text-charcoal-muted">
           Drag the slider to compare original ↔ rendered
         </p>
+
+        {/* Admin-visible footer. Tiny dot on the right when backup ran; tap to
+            expand into model name + primary error. Homeowners won't notice. */}
+        <div className="mt-1 flex items-center justify-center gap-2 text-[11px] text-charcoal-muted/60">
+          <button
+            type="button"
+            onClick={() => setShowDebug((s) => !s)}
+            className="flex items-center gap-1.5 rounded-full px-2 py-0.5 transition hover:bg-charcoal/5"
+            aria-label="Toggle render info"
+          >
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${
+                activeFallbackUsed ? "bg-amber-500" : "bg-charcoal/20"
+              }`}
+            />
+            <span>{showDebug ? "hide info" : "info"}</span>
+          </button>
+        </div>
+        {showDebug && (
+          <div className="mt-1 max-w-md rounded-lg bg-charcoal/5 px-3 py-2 text-center text-[11px] text-charcoal-muted">
+            <div>
+              rendered by <span className="font-medium text-charcoal">{shortModel(activeUsedModel ?? primaryModel)}</span>
+            </div>
+            {activeFallbackUsed && (
+              <div className="mt-0.5 text-amber-700">
+                ⚡ backup used — primary {shortModel(primaryModel)} failed
+                {primaryError ? `: ${primaryError}` : ""}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Label input */}

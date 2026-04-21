@@ -9,7 +9,7 @@ export async function GET(
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("generations")
-    .select("id, status, result_url, error")
+    .select("id, status, result_url, error, used_model, fallback_used, primary_error, image_model")
     .eq("id", genId)
     .single();
 
@@ -22,5 +22,9 @@ export async function GET(
     status: data.status,
     resultUrl: data.result_url,
     error: data.error,
+    primaryModel: data.image_model,
+    usedModel: data.used_model,
+    fallbackUsed: Boolean(data.fallback_used),
+    primaryError: data.primary_error,
   });
 }

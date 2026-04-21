@@ -92,11 +92,11 @@ export async function POST(request: Request) {
         .update({ status: "processing" })
         .eq("id", genId);
 
-      // 1. Build the static Gemini prompt (no LLM fusion)
+      // 1. Build the static prompt (no LLM fusion)
       const counts = countStrokes(strokes);
       const finalPrompt = buildFinalPrompt(counts, notes);
       const userMessage = `permanent:${counts.permanent} uplight:${counts.uplight} downlight:${counts.downlight} pathlight:${counts.pathlight}${notes.trim() ? ` notes:"${notes.trim()}"` : ""}`;
-      const imageModel = getImageModel();
+      const primaryModel = getImageModel();
 
       await supabase
         .from("generations")
@@ -105,19 +105,23 @@ export async function POST(request: Request) {
           user_message: userMessage,
           fused_prompt: finalPrompt,
           fusion_reasoning: null,
-          image_model: imageModel,
+          image_model: primaryModel,
           fusion_log: finalPrompt,
         })
         .eq("id", genId);
 
-      // 2. Gemini image generation
-      const resultBuffer = await runImagePipeline(annotatedBuffer, finalPrompt);
+      // 2. Image generation (primary + automatic fallback)
+      const pipelineResult = await runImagePipeline(
+        annotatedBuffer,
+        finalPrompt,
+        annotatedUrl,
+      );
 
       // 3. Upload result to Supabase Storage
       const resultPath = `${sessionId}/${genId}.png`;
       const { error: resultUploadErr } = await supabase.storage
         .from("results")
-        .upload(resultPath, resultBuffer, {
+        .upload(resultPath, pipelineResult.bytes, {
           contentType: "image/png",
           upsert: false,
         });
@@ -130,13 +134,16 @@ export async function POST(request: Request) {
         data: { publicUrl: resultUrl },
       } = supabase.storage.from("results").getPublicUrl(resultPath);
 
-      // 4. Mark complete
+      // 4. Mark complete (recording which provider won)
       await supabase
         .from("generations")
         .update({
           status: "complete",
           result_url: resultUrl,
           attempts: 1,
+          used_model: pipelineResult.usedModel,
+          fallback_used: pipelineResult.fallbackUsed,
+          primary_error: pipelineResult.primaryError,
         })
         .eq("id", genId);
     } catch (err) {

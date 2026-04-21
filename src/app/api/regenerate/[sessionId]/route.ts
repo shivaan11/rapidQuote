@@ -102,12 +102,16 @@ export async function POST(
         })
         .eq("id", genId);
 
-      const resultBuffer = await runImagePipeline(annotatedBuffer, finalPrompt);
+      const pipelineResult = await runImagePipeline(
+        annotatedBuffer,
+        finalPrompt,
+        lastGen.annotated_url,
+      );
 
       const resultPath = `${sessionId}/${genId}.png`;
       const { error: uploadErr } = await supabase.storage
         .from("results")
-        .upload(resultPath, resultBuffer, {
+        .upload(resultPath, pipelineResult.bytes, {
           contentType: "image/png",
           upsert: false,
         });
@@ -120,7 +124,14 @@ export async function POST(
 
       await supabase
         .from("generations")
-        .update({ status: "complete", result_url: resultUrl, attempts: 1 })
+        .update({
+          status: "complete",
+          result_url: resultUrl,
+          attempts: 1,
+          used_model: pipelineResult.usedModel,
+          fallback_used: pipelineResult.fallbackUsed,
+          primary_error: pipelineResult.primaryError,
+        })
         .eq("id", genId);
     } catch (err) {
       const message =

@@ -79,6 +79,8 @@ Fill in all 6 values:
 | `ANTHROPIC_API_KEY` | Anthropic Console |
 | `GEMINI_API_KEY` | Google AI Studio |
 | `GEMINI_IMAGE_MODEL` | `gemini-3-pro-image-preview` (pinned — Nano Banana Pro) |
+| `FAL_KEY` | fal.ai dashboard (optional — enables FLUX Kontext Pro backup if Gemini 5xxs) |
+| `FAL_IMAGE_MODEL` | Defaults to `fal-ai/flux-pro/kontext` |
 
 ### 6. Run locally
 
@@ -181,8 +183,10 @@ npm run lint       # ESLint
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes (browser) | Supabase anon key for client reads |
 | `SUPABASE_SERVICE_KEY` | **No** (server only) | Supabase service role key — bypasses RLS |
 | `ANTHROPIC_API_KEY` | No | Claude Haiku 4.5 for prompt fusion |
-| `GEMINI_API_KEY` | No | Google Gemini for image generation |
+| `GEMINI_API_KEY` | No | Google Gemini for image generation (primary) |
 | `GEMINI_IMAGE_MODEL` | No | Pinned model ID (e.g. `gemini-3-pro-image-preview`) |
+| `FAL_KEY` | No | fal.ai key for backup FLUX Kontext Pro (used only if Gemini fails) |
+| `FAL_IMAGE_MODEL` | No | fal.ai endpoint id, defaults to `fal-ai/flux-pro/kontext` |
 
 **Never commit `.env.local` or expose `SUPABASE_SERVICE_KEY` to the browser.**
 

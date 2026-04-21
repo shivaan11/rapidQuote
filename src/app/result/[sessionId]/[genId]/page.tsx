@@ -18,12 +18,14 @@ export default async function ResultPage(
         .single(),
       supabase
         .from("generations")
-        .select("id, status, result_url, annotated_url, fusion_log, error")
+        .select(
+          "id, status, result_url, annotated_url, fusion_log, error, used_model, fallback_used, primary_error, image_model",
+        )
         .eq("id", genId)
         .single(),
       supabase
         .from("generations")
-        .select("id, status, result_url, created_at")
+        .select("id, status, result_url, created_at, fallback_used, used_model")
         .eq("session_id", sessionId)
         .eq("status", "complete")
         .order("created_at", { ascending: false }),
@@ -43,6 +45,8 @@ export default async function ResultPage(
     resultUrl: g.result_url!,
     label: `Generation ${(allGenerations?.length ?? 0) - i}`,
     createdAt: g.created_at,
+    fallbackUsed: Boolean(g.fallback_used),
+    usedModel: g.used_model ?? null,
   }));
 
   return (
@@ -54,6 +58,10 @@ export default async function ResultPage(
       annotatedUrl={generation.annotated_url ?? undefined}
       label={session.label ?? undefined}
       generations={generationOptions}
+      primaryModel={generation.image_model ?? null}
+      usedModel={generation.used_model ?? null}
+      fallbackUsed={Boolean(generation.fallback_used)}
+      primaryError={generation.primary_error ?? null}
     />
   );
 }

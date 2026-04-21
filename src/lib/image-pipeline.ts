@@ -1,29 +1,19 @@
 import { readFile } from "fs/promises";
 import path from "path";
-import { getGemini, getImageModel } from "./gemini";
+import { config } from "./config";
+import { geminiProvider } from "./providers/gemini";
+import { fluxKontextProvider } from "./providers/flux";
+import {
+  ProviderRefusalError,
+  type ImageProvider,
+  type ProviderInput,
+  type StickerRefs,
+} from "./providers/types";
 
-export class GeminiRefusalError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "GeminiRefusalError";
-  }
-}
-
-// Neutral alias so routes can import either name.
-export { GeminiRefusalError as ImageGenRefusalError };
-
-function sniffImageMimeType(buf: Buffer): "image/jpeg" | "image/png" {
-  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
-    return "image/png";
-  }
-  return "image/jpeg";
-}
-
-type StickerRefs = {
-  uplight: Buffer;
-  downlight: Buffer;
-  pathlight: Buffer;
-};
+// Re-exported under the old names so existing imports keep working.
+export { ProviderRefusalError as GeminiRefusalError };
+export { ProviderRefusalError as ImageGenRefusalError };
+export { ProviderRefusalError };
 
 let cachedStickers: StickerRefs | null = null;
 
@@ -39,84 +29,86 @@ async function loadStickerRefs(): Promise<StickerRefs> {
   return cachedStickers;
 }
 
+export type PipelineInput = {
+  annotatedBytes: Buffer;
+  annotatedUrl: string;
+  prompt: string;
+};
+
+export type PipelineResult = {
+  bytes: Buffer;
+  usedModel: string;
+  usedProvider: string;
+  fallbackUsed: boolean;
+  primaryError: string | null;
+};
+
+/**
+ * Try the primary provider (Gemini Nano Banana Pro) first. If it throws for
+ * any reason other than a content refusal, transparently fall back to the
+ * backup provider (FLUX Kontext Pro on fal.ai). Refusals propagate — the
+ * model actively rejecting the image isn't an availability issue, and
+ * retrying on a different model usually won't help.
+ */
 export async function runImagePipeline(
   annotatedBytes: Buffer,
   finalPrompt: string,
-): Promise<Buffer> {
-  const ai = getGemini();
-  const model = getImageModel();
-  const annotatedMime = sniffImageMimeType(annotatedBytes);
+  annotatedUrl?: string,
+): Promise<PipelineResult> {
   const refs = await loadStickerRefs();
+  const input: ProviderInput = {
+    annotatedBytes,
+    annotatedUrl: annotatedUrl ?? "",
+    prompt: finalPrompt,
+    refs,
+  };
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: finalPrompt },
-          {
-            inlineData: {
-              mimeType: annotatedMime,
-              data: annotatedBytes.toString("base64"),
-            },
-          },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: refs.uplight.toString("base64"),
-            },
-          },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: refs.downlight.toString("base64"),
-            },
-          },
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: refs.pathlight.toString("base64"),
-            },
-          },
-        ],
-      },
-    ],
-    config: {
-      responseModalities: ["TEXT", "IMAGE"],
-    },
-  });
+  const primary = geminiProvider;
+  const backupAvailable = config.fal.configured();
 
-  const candidates = response.candidates;
-  if (!candidates || candidates.length === 0) {
-    const blockReason = response.promptFeedback?.blockReason;
-    if (blockReason) {
-      throw new GeminiRefusalError(
-        `Gemini blocked this image (reason: ${blockReason}). Try adjusting your annotations.`,
-      );
-    }
-    throw new Error("Gemini returned no candidates");
-  }
+  try {
+    const bytes = await primary.generate(input);
+    return {
+      bytes,
+      usedModel: primary.modelId,
+      usedProvider: primary.name,
+      fallbackUsed: false,
+      primaryError: null,
+    };
+  } catch (err) {
+    if (err instanceof ProviderRefusalError) throw err;
 
-  const parts = candidates[0].content?.parts;
-  if (!parts) {
-    throw new Error("Gemini candidate has no content parts");
-  }
-
-  for (const part of parts) {
-    if (part.inlineData?.data) {
-      return Buffer.from(part.inlineData.data, "base64");
-    }
-  }
-
-  const finishReason = candidates[0].finishReason;
-  if (finishReason === "SAFETY") {
-    throw new GeminiRefusalError(
-      "Gemini's safety filter rejected this image. Try a different photo or simpler annotations.",
+    const primaryError = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[pipeline] primary (${primary.name} / ${primary.modelId}) failed: ${primaryError}`,
     );
-  }
 
-  throw new Error(
-    `Gemini returned no image data (finishReason: ${finishReason ?? "unknown"})`,
-  );
+    if (!backupAvailable) {
+      console.warn("[pipeline] no backup provider configured (FAL_KEY missing)");
+      throw err;
+    }
+
+    if (!annotatedUrl) {
+      console.warn("[pipeline] backup requires annotatedUrl, none provided");
+      throw err;
+    }
+
+    return runBackup(fluxKontextProvider, input, primaryError);
+  }
+}
+
+async function runBackup(
+  provider: ImageProvider,
+  input: ProviderInput,
+  primaryError: string,
+): Promise<PipelineResult> {
+  console.warn(`[pipeline] falling back to ${provider.name} / ${provider.modelId}`);
+  const bytes = await provider.generate(input);
+  return {
+    bytes,
+    usedModel: provider.modelId,
+    usedProvider: provider.name,
+    fallbackUsed: true,
+    primaryError,
+  };
 }
